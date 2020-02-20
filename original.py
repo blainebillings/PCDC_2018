@@ -1,142 +1,44 @@
-import os
-import time
-
-lines = os.popen('sudo cat /etc/shells').readlines()[1:]
-possible_shells = []
-
-for line in lines:
-    while "/" in line:
-   	 line = line[line.index("/") + 1:]
-    possible_shells.append(line[:-1])
-
-lines = os.popen('sudo ps aux').readlines()[1:]
-beginning_shells = []
-
-for line in lines:
-    keep = False
-
-    while " " in line:
-   	 line = line[line.index(" ") + 1:]
-   	 if " " in line:
-   		 if line.index(" ") != 0 and not keep:
-   			 pid = line[:line.index(" ")]
-   			 keep = True
-
-    line = line[:-1]
-    if line in possible_shells:
-   	 beginning_shells.append(pid)
-
-reported_and_running = {}
-
+import os, time
+def f_s(l):
+    a = l[l.rfind(' ')+1:-1]
+    return a[a.rfind('/')+1:]
+def l_s(l, i):
+    return l.split()[i]
+r_r = {}
+p_s = [f_s(l)[f_s(l).rfind('/')+1:] for l in os.popen('sudo cat /etc/shells').readlines()[1:] if "/" in l]
+b_s = [l_s(l, 1) for l in os.popen('sudo ps -aux').readlines()[1:] if f_s(l) in p_s]
+o_l = os.popen('sudo systemctl -a --plain').readlines()
+c_s = dict((l_s(l, 0), l_s(l, 2)) for l in o_l[:o_l.index("\n")])
+i_p = os.popen('(sudo cat /etc/passwd | awk \'{print "PWD: " $0}\' && sudo cat /etc/shadow | awk \'{print "SHD: " $0}\')').readlines()
 while True:
-    time.sleep(1)
-    lines = os.popen('sudo ps aux').readlines()[1:]
-    
-    for x in reported_and_running.keys():
-   	 reported_and_running[x] = False
-
-    for line in lines:
-   	 original = line
-   	 keep = False
-
-   	 while " " in line:
-   		 line = line[line.index(" ") + 1:]
-   		 if " " in line:
-   			 if line.index(" ") != 0 and not keep:
-   				 pid = line[:line.index(" ")]
-   				 keep = True
-    
-   	 line = line[:-1]
-   	 if line in possible_shells and pid not in beginning_shells and pid not in reported_and_running.keys():
-   		 print("\nSHELL SPAWNED: shell = " + line + ", pid = " + pid)
-   		 print(original)
-   		 reported_and_running[pid] = True
-   	 if line in possible_shells and pid not in beginning_shells and pid in reported_and_running.keys():
-   		 reported_and_running[pid] = True
-
-    for x in reported_and_running.keys():
-   	 if reported_and_running[x] == False:
-   		 reported_and_running.pop(x, None)
-import os
-import time
-
-lines = os.popen('sudo service --status-all').readlines()
-current = {}
-
-for line in lines:
-    sign = line[line.index("[") + 2]
-    name = line[line.index("]") + 3:-1]
-    current[name] = sign
-    print(name + ": " + sign)
-
-while True:
-    time.sleep(1)
-    lines = os.popen('sudo service --status-all').readlines()
-    
-    for line in lines:
-   	 sign = line[line.index("[") + 2]
-   	 name = line[line.index("]") + 3:-1]
-
-   	 if name not in current.keys():
-   		 print("Service Added! " + name + ":" + sign)
-   		 current[name] = sign
-   	 elif current[name] != sign:
-   		 print("Service Status Changed! " + name + " now " + sign)
-   		 current[name] = sign
-
-    for line in current.keys():
-   	 if line not in lines:
-   		 print("Service Deleted! " + line[line.index("]") + 3:-1])
-
-initial_passwd = []
-initial_shadow = []
-
-lines = os.popen('sudo cat /etc/passwd').readlines()
-
-for line in lines:
-    initial_passwd.append(line)
-
-lines = os.popen('sudo cat /etc/shadow').readlines()
-
-for line in lines:
-    initial_shadow.append(line)
-
-while True:
-    time.sleep(1)
-    lines = os.popen('sudo cat /etc/passwd').readlines()
-
-    process = {}
-
-    for line in lines:
-   	 process[line] = False
-
-    for line in initial_passwd:
-   	 if line not in process.keys():
-   		 print('Passwd Deletion: \n' + line)
-   		 initial_passwd.remove(line)
-   	 else:
-   		 process[line] = True
-
-    for line in process.keys():
-   	 if process[line] is False:
-   		 print('Passwd Addition: \n' + line)
-   		 initial_passwd.append(line)
-
-    lines = os.popen('sudo cat /etc/shadow').readlines()
-
-    process = {}
-
-    for line in lines:
-   	 process[line] = False
-
-    for line in initial_shadow:
-   	 if line not in process.keys():
-   		 print('Shadow Deletion: \n' + line)
-   		 initial_shadow.remove(line)
-   	 else:
-   		 process[line] = True
-
-    for line in process.keys():
-   	 if process[line] is False:
-   		 print('Shadow Addition: \n' + line)
-   		 initial_shadow.append(line)
+    time.sleep(0.1)
+    o_l = os.popen('sudo ps -aux').readlines()[1:]
+    r_r = dict.fromkeys(r_r, False)
+    for l in (l for l in o_l if f_s(l) in p_s and l_s(l, 1) not in b_s):
+        if l_s(l, 1) not in r_r.keys():
+            print("NEW SHL: shell=" + f_s(l) + ", pid=" + l_s(l, 1) + "|" + l[:-1])
+        r_r[l_s(l, 1)] = True
+    r_r.pop((x for x in r_r.keys() if r_r[x] == False), None)
+    o_l = os.popen('sudo systemctl -a --plain').readlines()
+    o_l = o_l[:o_l.index("\n")]
+    for l in (l for l in o_l if l_s(l, 0) not in c_s.keys() or c_s[l_s(l, 0)] != l_s(l, 2)):
+        print(("SRV ADD -> " if l_s(l, 0) not in c_s.keys() else "SRV CHN -> ") + l_s(l, 0) + ":" + l_s(l, 2))
+        c_s[l_s(l, 0)] = l_s(l, 2)
+    for p in [l for l in c_s.keys() if l not in [l_s(k, 0) for k in o_l]]:
+        print("SRV DEL -> " + p + 0*c_s.pop(p, None))
+    o_l = os.popen('(sudo cat /etc/passwd | awk \'{print "PWD: " $0}\' && sudo cat /etc/shadow | awk \'{print "SHD: " $0}\')').readlines()
+    for l in (l for l in i_p if l not in o_l):
+        print('DEL ' + i_p.pop(i_p.index(l))[:-1])
+    for l in (l for l in o_l if l not in i_p):
+        print('ADD ' + (l[:-1] + str(i_p.append(l) is None) * 0))
+# f_s - Find Shell in ps Line
+# g_p - Get pid from line
+# l_v - Get Service from Line
+# l_t - Get Status from Line
+# o_l - Output Lines
+# p_s - Possible Shells
+# b_s - Beginning Shells
+# r_r - Reported and Running
+# c_s - Current Status
+# i_p - Initial Passwd
+# i_s - Initial Shadow
